@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrazione Presenze QR</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #83a4d4, #b6fbff);
+      color: #2e7d32;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    #reader {
+      width: 100%;
+      margin: 20px auto;
+    }
+    .button-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 10px;
+      margin-top: 20px;
+
+      display: flex;
+      justify-content: space-around;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    button {
+      flex: 1 1 calc(50% - 20px);
+      max-width: 200px;
+      padding: 12px 20px;
+      color: white;
+      border: none;
+      background-color: #16a085;
+      border-radius: 8px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #next-page {
+      background-color: slategrey; /* Nuova tonalità di verde */
+    }
+    #stop-scanner {
+      background-color: red;
+    }
+    #generate-pdf {
+      background-color: blue;
+    }
+    button:hover {
+      background-color: #2e7d32;
+    }
+    #status, ul {
+      margin: 20px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: #f1f8e9;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+    }
+    .logo-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .logo {
+      max-width: 450px;
+      height: auto;
+    }
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const scannedItems = {};
+      const html5QrCode = new Html5Qrcode("reader");
+
+      const updateList = (name, id) => {
+        const list = document.getElementById("scanned-items");
+        const item = document.createElement("li");
+        item.innerText = `${name} - Matricola: ${id}`;
+        list.appendChild(item);
+      };
+
+      const parseQRCode = (decodedText) => {
+        try {
+          const data = JSON.parse(decodedText);
+
+          const name = `${data.name || "Nome non disponibile"} ${data.surname || "Cognome non disponibile"}`;
+          const id = data.id || "Matricola non disponibile";
+
+          if (scannedItems[id]) {
+            document.getElementById("status").innerText = "Codice QR già scansionato!";
+            return;
+          }
+
+          scannedItems[id] = { name, id };
+          updateList(name, id);
+          document.getElementById("status").innerText = "QR Code Scansionato!";
+        } catch (err) {
+          console.error("Errore nel parsing del QR Code: ", err);
+          document.getElementById("status").innerText = "Formato codice QR non valido.";
+        }
+      };
+
+      document.getElementById("start-scanner").addEventListener('click', () => {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            parseQRCode(decodedText);
+          },
+          (err) => {
+            console.log(`Errore Scanner: ${err}`);
+          }
+        );
+      });
+
+      document.getElementById("stop-scanner").addEventListener('click', () => {
+        html5QrCode.stop();
+        document.getElementById("status").innerText = "Scanner fermato.";
+      });
+
+      document.getElementById("generate-pdf").addEventListener('click', () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Ottieni la data attuale
+        const today = new Date();
+        const formattedDate = today.toISOString().split("T")[0]; // Formato YYYY-MM-DD
+
+        // Titolo con data
+        doc.text(`Elenco Codici QR Scansionati - ${formattedDate}`, 10, 10);
+
+        // Contenuti PDF
+        const items = Object.values(scannedItems);
+
+        if (items.length > 0) {
+          doc.autoTable({
+            head: [["Indice", "Nome", "Matricola"]],
+            body: items.map((item, index) => [index + 1, item.name, item.id]),
+          });
+        } else {
+          doc.text("Nessun codice scansionato.", 10, 20);
+        }
+
+        // Nome del file con data
+        doc.save(`ScansioniQR_${formattedDate}.pdf`);
+      });
+      document.getElementById("next-page").addEventListener('click', () => {
+        window.location.href = "index.html";
+      });
+
+      document.getElementById("reload-page").addEventListener('click', () => {
+        window.location.reload();
+      });
+    });
+  </script>
+</head>
+<body>
+<div class="logo-container">
+  <img src="img/LOGO.png" alt="Logo" class="logo">
+</div>
+<div class="container">
+  <h1>Scansiona il tuo QR Code</h1>
+  <div id="reader"></div>
+  <div id="status">In attesa di scansione...</div>
+  <ul id="scanned-items"></ul>
+  <div class="button-container">
+    <button id="start-scanner">Avvia Scanner</button>
+    <button id="stop-scanner">Ferma Scanner</button>
+    <button id="generate-pdf">Genera PDF</button>
+
+    <button id="next-page">Indietro</button>
+  </div>
+</div>
+</body>
+</html>
